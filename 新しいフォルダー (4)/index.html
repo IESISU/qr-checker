@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>QR照合ツール</title>
+    <!-- PWAのための設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/007bff/ffffff?text=QR">
+    <link rel="manifest" href="manifest.json">
+    
+    <style>
+        /* CSSスタイルは変更ありません */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        :root { --primary-color: #007bff; --secondary-color: #6c757d; --success-color: #28a745; --danger-color: #dc3545; --light-color: #f8f9fa; --dark-color: #343a40; }
+        body { font-family: 'Noto Sans JP', sans-serif; margin: 0; padding: 0; background-color: var(--light-color); color: var(--dark-color); display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        header { width: 100%; background-color: var(--dark-color); color: white; padding: 15px 0; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        main { width: 100%; max-width: 600px; padding: 20px; box-sizing: border-box; flex-grow: 1; }
+        #reader { width: 100%; border: 2px dashed var(--secondary-color); border-radius: 8px; background: #eee; aspect-ratio: 1 / 1; display: none; margin-bottom: 20px; }
+        .controls { text-align: center; margin-bottom: 20px; display: flex; justify-content: center; gap: 10px; }
+        .btn { padding: 12px 20px; font-size: 16px; border-radius: 8px; border: none; cursor: pointer; color: white; font-weight: 700; transition: all 0.2s ease-in-out; }
+        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        .btn-start { background-color: var(--primary-color); } .btn-start:hover:not(:disabled) { background-color: #0056b3; }
+        .btn-reset { background-color: var(--secondary-color); } .btn-reset:hover:not(:disabled) { background-color: #5a6268; }
+        .btn-export { background-color: var(--success-color); } .btn-export:hover:not(:disabled) { background-color: #218838; }
+        .status-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .status-message { text-align: center; font-size: 20px; font-weight: 700; margin-bottom: 15px; padding: 10px; border-radius: 5px; background-color: #e9ecef; }
+        .scan-result { margin-bottom: 10px; } .scan-result span { font-weight: 700; display: block; margin-bottom: 5px; } .scan-result p { background: #f1f3f5; padding: 10px; border-radius: 5px; word-wrap: break-word; margin: 0; min-height: 24px; }
+        .final-result { text-align: center; font-size: 32px; font-weight: 700; padding: 20px; border-radius: 8px; margin-top: 15px; display: none; }
+        .result-match { background-color: var(--success-color); color: white; } .result-mismatch { background-color: var(--danger-color); color: white; }
+        .data-summary { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
+        .data-summary p { font-size: 18px; margin: 0 0 10px 0; }
+        .btn-clear { background-color: transparent; color: var(--danger-color); border: 1px solid var(--danger-color); padding: 8px 16px; font-size: 14px; font-weight: normal; }
+        .btn-clear:hover:not(:disabled) { background-color: var(--danger-color); color: white; }
+    </style>
+</head>
+<body>
+    <header><h1>QRコード照合ツール</h1></header>
+    <main>
+        <div class="controls">
+            <button id="startButton" class="btn btn-start">照合を開始</button>
+            <button id="resetButton" class="btn btn-reset" style="display: none;">リセット</button>
+            <button id="exportButton" class="btn btn-export" disabled>CSVエクスポート</button>
+        </div>
+        <div id="reader"></div>
+        <div class="status-container">
+            <p id="statusMessage" class="status-message">開始ボタンを押してください</p>
+            <div class="scan-result"><span>1枚目のQRコード:</span><p id="firstScanResult">-</p></div>
+            <div class="scan-result"><span>2枚目のQRコード:</span><p id="secondScanResult">-</p></div>
+            <div id="finalResult" class="final-result"></div>
+        </div>
+        <div class="data-summary">
+            <p>蓄積データ: <span id="recordCount">0</span> 件</p>
+            <button id="clearDataButton" class="btn btn-clear" disabled>全データクリア</button>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
+    <script>
+        // Service Workerの登録
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+
+        // アプリの本体ロジック (変更なし)
+        const startButton = document.getElementById('startButton'); const resetButton = document.getElementById('resetButton'); const exportButton = document.getElementById('exportButton'); const clearDataButton = document.getElementById('clearDataButton'); const readerElement = document.getElementById('reader'); const statusMessage = document.getElementById('statusMessage'); const firstScanResultEl = document.getElementById('firstScanResult'); const secondScanResultEl = document.getElementById('secondScanResult'); const finalResultEl = document.getElementById('finalResult'); const recordCountEl = document.getElementById('recordCount');
+        let firstScanData = null; let isWaitingForSecondScan = false; let html5QrCode = null; let accumulatedData = [];
+        function resetCurrentScan() { firstScanData = null; isWaitingForSecondScan = false; statusMessage.textContent = '開始ボタンを押してください'; firstScanResultEl.textContent = '-'; secondScanResultEl.textContent = '-'; finalResultEl.style.display = 'none'; finalResultEl.classList.remove('result-match', 'result-mismatch'); startButton.style.display = 'inline-block'; startButton.disabled = false; resetButton.style.display = 'none'; if (html5QrCode && html5QrCode.isScanning) { html5QrCode.stop().catch(err => console.error("スキャナ停止エラー:", err)); } readerElement.style.display = 'none'; }
+        function clearAllData() { accumulatedData = []; updateRecordCount(); }
+        function updateRecordCount() { const count = accumulatedData.length; recordCountEl.textContent = count; exportButton.disabled = count === 0; clearDataButton.disabled = count === 0; }
+        function onScanSuccess(decodedText) { if (!isWaitingForSecondScan) { firstScanData = decodedText; firstScanResultEl.textContent = decodedText; statusMessage.textContent = '✅ 1枚目OK！2枚目をスキャンしてください'; isWaitingForSecondScan = true; } else { const secondScanData = decodedText; secondScanResultEl.textContent = secondScanData; const isMatch = firstScanData === secondScanData; if (isMatch) { finalResultEl.textContent = '一致しました'; finalResultEl.className = 'final-result result-match'; } else { finalResultEl.textContent = '不一致です'; finalResultEl.className = 'final-result result-mismatch'; } const comparisonResult = { timestamp: new Date().toLocaleString('ja-JP'), firstValue: firstScanData, secondValue: secondScanData, result: isMatch ? '一致' : '不一致' }; accumulatedData.push(comparisonResult); updateRecordCount(); finalResultEl.style.display = 'block'; statusMessage.textContent = '照合完了。リセットして次へ。'; stopScanner(true); } }
+        function startScanner() { resetCurrentScan(); startButton.style.display = 'none'; resetButton.style.display = 'inline-block'; readerElement.style.display = 'block'; statusMessage.textContent = '1枚目のQRコードをスキャンしてください'; html5QrCode = new Html5Qrcode("reader"); const config = { fps: 10, qrbox: { width: 250, height: 250 } }; html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess).catch(err => { console.error("スキャナ起動エラー:", err); statusMessage.textContent = 'カメラの起動に失敗しました。権限を許可してください。'; }); }
+        function stopScanner(disableStart = false) { startButton.disabled = disableStart; if (html5QrCode && html5QrCode.isScanning) { html5QrCode.stop().then(() => { readerElement.style.display = 'none'; }).catch(err => console.error("スキャナ停止エラー:", err)); } }
+        function exportToCsv() { if (accumulatedData.length === 0) { alert('エクスポートするデータがありません。'); return; } let csvContent = "日時,1枚目のデータ,2枚目のデータ,照合結果\n"; accumulatedData.forEach(row => { const timestamp = `"${row.timestamp}"`; const first = `"${row.firstValue}"`; const second = `"${row.secondValue}"`; const result = `"${row.result}"`; csvContent += [timestamp, first, second, result].join(',') + '\n'; }); const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); const url = URL.createObjectURL(blob); link.setAttribute("href", url); const now = new Date(); const filename = `qr_data_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}.csv`; link.setAttribute("download", filename); link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
+        startButton.addEventListener('click', startScanner); resetButton.addEventListener('click', resetCurrentScan); exportButton.addEventListener('click', exportToCsv); clearDataButton.addEventListener('click', () => { if (accumulatedData.length > 0) { clearAllData(); alert('蓄積データをすべてクリアしました。'); } });
+        resetCurrentScan(); updateRecordCount();
+    </script>
+</body>
+</html>
