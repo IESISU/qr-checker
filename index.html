@@ -95,7 +95,7 @@
             oscillator.type = type;
             oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + delay);
             gainNode.gain.setValueAtTime(0, audioContext.currentTime + delay);
-            gainNode.gain.linearRampToValueAtTime(0.5, audioContext.currentTime + delay + 0.01);
+            gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + delay + 0.01);
             
             oscillator.start(audioContext.currentTime + delay);
             gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + delay + duration);
@@ -105,15 +105,17 @@
         function playSound(type) {
             switch (type) {
                 case 'scan':
-                    playTone(900, 0.15, 'triangle');
+                    playTone(1200, 0.1, 'sine');
                     break;
-                case 'success': // 「ピンポーン」
-                    playTone(880.00, 0.2, 'sine', 0);    
-                    playTone(659.26, 0.25, 'sine', 0.2); 
+                case 'success': // ファンファーレ風
+                    playTone(523.25, 0.15, 'triangle', 0);    // C5
+                    playTone(659.26, 0.15, 'triangle', 0.15); // E5
+                    playTone(783.99, 0.15, 'triangle', 0.3);  // G5
+                    playTone(1046.50, 0.3, 'triangle', 0.45); // C6
                     break;
-                case 'fail': // 甲高い「ブッブー」
-                    playTone(392.00, 0.2, 'square', 0);      // G4
-                    playTone(392.00, 0.2, 'square', 0.25);   // G4を少し遅らせて再度
+                case 'fail': // 不協和音のブザー
+                    playTone(440.00, 0.4, 'sawtooth'); // A4
+                    playTone(233.08, 0.4, 'sawtooth', 0.02); // A#3
                     break;
             }
         }
@@ -148,19 +150,16 @@
         }
 
         function onScanSuccess(decodedText) {
-            // スキャナが一時停止中は何もしない
             if (!html5QrCode || html5QrCode.getState() !== 2 /* SCANNING */) {
                 return;
             }
 
             if (!isWaitingForSecondScan) {
-                // 1枚目のスキャン後にスキャナを一時停止
                 html5QrCode.pause(); 
 
                 if (decodedText.length < 57) {
                     statusMessage.textContent = 'エラー: 1枚目のQRデータが短すぎます';
                     playSound('fail');
-                    // 1.5秒後にスキャンを再開
                     setTimeout(() => { if(html5QrCode) html5QrCode.resume(); }, 1500);
                     return;
                 }
@@ -173,7 +172,6 @@
                 isWaitingForSecondScan = true;
                 playSound('scan');
                 
-                // 1.5秒後にスキャンを再開
                 setTimeout(() => {
                     if (html5QrCode && html5QrCode.getState() === 3 /* PAUSED */) {
                         statusMessage.textContent = '2枚目をスキャンしてください';
@@ -182,7 +180,6 @@
                 }, 1500);
 
             } else {
-                // 2枚目読み取り後
                 if (decodedText.length < 60) {
                     statusMessage.textContent = 'エラー: 2枚目のQRデータが短すぎます';
                     playSound('fail');
