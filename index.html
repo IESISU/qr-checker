@@ -11,10 +11,18 @@
     <link rel="manifest" href="manifest.json">
     
     <style>
-        /* CSSスタイルは変更ありません */
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
-        :root { --primary-color: #007bff; --secondary-color: #6c757d; --success-color: #28a745; --danger-color: #dc3545; --light-color: #f8f9fa; --dark-color: #343a40; }
-        body { font-family: 'Noto Sans JP', sans-serif; margin: 0; padding: 0; background-color: var(--light-color); color: var(--dark-color); display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        /* Webフォントの読み込みを削除し、システムフォントを指定 */
+        :root {
+            --primary-color: #007bff; --secondary-color: #6c757d; --success-color: #28a745;
+            --danger-color: #dc3545; --light-color: #f8f9fa; --dark-color: #343a40;
+        }
+        body {
+            /* スマホに最適化された標準フォントを使うように変更 */
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans CJK JP', sans-serif;
+            margin: 0; padding: 0; background-color: var(--light-color); color: var(--dark-color);
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+        }
+        /* その他のCSSスタイルは変更ありません */
         header { width: 100%; background-color: var(--dark-color); color: white; padding: 15px 0; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         main { width: 100%; max-width: 600px; padding: 20px; box-sizing: border-box; flex-grow: 1; }
         #reader { width: 100%; border: 2px dashed var(--secondary-color); border-radius: 8px; background: #eee; aspect-ratio: 1 / 1; display: none; margin-bottom: 20px; }
@@ -86,45 +94,41 @@
         let isWaitingForSecondScan = false;
         let html5QrCode = null;
         let accumulatedData = [];
-        
-        // --- 音声再生のための設定 ---
         let audioContext;
+
+        // --- 関数の定義 ---
         function initAudioContext() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
         }
-        
+
         function playSound(type) {
             if (!audioContext) return;
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-
             gainNode.gain.setValueAtTime(0, audioContext.currentTime);
             gainNode.gain.linearRampToValueAtTime(0.5, audioContext.currentTime + 0.01);
-
             switch (type) {
                 case 'scan':
-                    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+                    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
                     break;
                 case 'success':
-                    oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
-                    oscillator.frequency.linearRampToValueAtTime(1046.50, audioContext.currentTime + 0.1); // C6
+                    oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+                    oscillator.frequency.linearRampToValueAtTime(1046.50, audioContext.currentTime + 0.1);
                     break;
                 case 'fail':
-                    oscillator.frequency.setValueAtTime(164.81, audioContext.currentTime); // E3
+                    oscillator.frequency.setValueAtTime(164.81, audioContext.currentTime);
                     break;
             }
-            
             oscillator.start(audioContext.currentTime);
             const duration = (type === 'fail') ? 0.3 : 0.15;
             gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration);
             oscillator.stop(audioContext.currentTime + duration);
         }
 
-        // --- 関数の定義 ---
         function resetCurrentScan() {
             firstScanData = null;
             isWaitingForSecondScan = false;
@@ -156,39 +160,35 @@
 
         function onScanSuccess(decodedText) {
             if (!isWaitingForSecondScan) {
-                // 1枚目のスキャン
                 if (decodedText.length < 57) {
                     statusMessage.textContent = 'エラー: 1枚目のQRデータが短すぎます';
                     playSound('fail');
                     return;
                 }
                 const part1 = decodedText.substring(0, 7);
-                const part2 = decodedText.substring(49, 57); // 50文字目から8文字
-                
-                firstScanData = { full: decodedText, part1: part1, part2: part2 };
-                
+                const part2 = decodedText.substring(49, 57);
+                firstScanData = {
+                    full: decodedText,
+                    part1: part1,
+                    part2: part2
+                };
                 firstScanPart1El.textContent = part1;
                 firstScanPart2El.textContent = part2;
-                
                 statusMessage.textContent = '✅ 1枚目OK！2枚目をスキャンしてください';
                 isWaitingForSecondScan = true;
                 playSound('scan');
             } else {
-                // 2枚目のスキャン
                 if (decodedText.length < 60) {
                     statusMessage.textContent = 'エラー: 2枚目のQRデータが短すぎます';
                     playSound('fail');
                     return;
                 }
-
                 const secondScanData = decodedText;
-                const searchArea1 = secondScanData.substring(39, 60); // 40文字目から
-                const searchArea2 = secondScanData.substring(14, 25); // 15文字目から
-
+                const searchArea1 = secondScanData.substring(39, 60);
+                const searchArea2 = secondScanData.substring(14, 25);
                 const condition1 = searchArea1.includes(firstScanData.part1);
                 const condition2 = searchArea2.includes(firstScanData.part2);
                 const isMatch = condition1 && condition2;
-                
                 if (isMatch) {
                     finalResultEl.textContent = '一致しました';
                     finalResultEl.className = 'final-result result-match';
@@ -198,7 +198,6 @@
                     finalResultEl.className = 'final-result result-mismatch';
                     playSound('fail');
                 }
-
                 const comparisonResult = {
                     timestamp: new Date().toLocaleString('ja-JP'),
                     qr1_full: firstScanData.full,
@@ -209,45 +208,52 @@
                 };
                 accumulatedData.push(comparisonResult);
                 updateRecordCount();
-
                 finalResultEl.style.display = 'block';
                 statusMessage.textContent = '照合完了。リセットして次へ。';
                 stopScanner(true);
             }
         }
-        
+
         function startScanner() {
-            initAudioContext(); // ユーザー操作をきっかけにAudioContextを初期化
+            initAudioContext();
             resetCurrentScan();
             startButton.style.display = 'none';
             resetButton.style.display = 'inline-block';
             readerElement.style.display = 'block';
             statusMessage.textContent = '1枚目のQRコードをスキャンしてください';
             html5QrCode = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+            const config = {
+                fps: 10,
+                qrbox: {
+                    width: 250,
+                    height: 250
+                }
+            };
+            html5QrCode.start({
+                    facingMode: "environment"
+                }, config, onScanSuccess)
                 .catch(err => {
                     console.error("Scanner start error:", err);
                     statusMessage.textContent = 'カメラの起動に失敗しました。';
                 });
         }
-        
+
         function stopScanner(disableStart = false) {
             startButton.disabled = disableStart;
             if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => { readerElement.style.display = 'none'; }).catch(err => console.error("Scanner stop error:", err));
+                html5QrCode.stop().then(() => {
+                    readerElement.style.display = 'none';
+                }).catch(err => console.error("Scanner stop error:", err));
             }
         }
-        
+
         function exportToCsv() {
             if (accumulatedData.length === 0) {
                 alert('エクスポートするデータがありません。');
                 return;
             }
-
             const header = ["日時", "QR1 全データ", "QR1 部品1(7桁)", "QR1 部品2(8桁)", "QR2 全データ", "照合結果"];
             let csvContent = header.join(',') + '\n';
-            
             accumulatedData.forEach(row => {
                 const rowData = [
                     row.timestamp,
@@ -256,15 +262,14 @@
                     row.qr1_part2,
                     row.qr2_full,
                     row.result
-                ].map(val => `"${val.replace(/"/g, '""')}"`); // ダブルクォートをエスケープ
-                
+                ].map(val => `"${val.replace(/"/g, '""')}"`);
                 csvContent += rowData.join(',') + '\n';
             });
-            
             const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-            const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+            const blob = new Blob([bom, csvContent], {
+                type: 'text/csv;charset=utf-8;'
+            });
             const link = document.createElement("a");
-            
             const url = URL.createObjectURL(blob);
             link.setAttribute("href", url);
             const now = new Date();
@@ -282,11 +287,11 @@
         exportButton.addEventListener('click', exportToCsv);
         clearDataButton.addEventListener('click', () => {
             if (accumulatedData.length > 0 && confirm('蓄積されたデータをすべてクリアしますか？')) {
-                 clearAllData();
-                 alert('蓄積データをすべてクリアしました。');
+                clearAllData();
+                alert('蓄積データをすべてクリアしました。');
             }
         });
-        
+
         // --- 初期化 ---
         resetCurrentScan();
         updateRecordCount();
