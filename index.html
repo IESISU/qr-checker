@@ -107,15 +107,15 @@
                 case 'scan':
                     playTone(1200, 0.1, 'sine');
                     break;
-                case 'success': // ファンファーレ風
-                    playTone(523.25, 0.15, 'triangle', 0);    // C5
-                    playTone(659.26, 0.15, 'triangle', 0.15); // E5
-                    playTone(783.99, 0.15, 'triangle', 0.3);  // G5
-                    playTone(1046.50, 0.3, 'triangle', 0.45); // C6
+                case 'success':
+                    playTone(523.25, 0.15, 'triangle', 0);
+                    playTone(659.26, 0.15, 'triangle', 0.15);
+                    playTone(783.99, 0.15, 'triangle', 0.3);
+                    playTone(1046.50, 0.3, 'triangle', 0.45);
                     break;
-                case 'fail': // 不協和音のブザー
-                    playTone(440.00, 0.4, 'sawtooth'); // A4
-                    playTone(233.08, 0.4, 'sawtooth', 0.02); // A#3
+                case 'fail':
+                    playTone(440.00, 0.4, 'sawtooth');
+                    playTone(233.08, 0.4, 'sawtooth', 0.02);
                     break;
             }
         }
@@ -224,17 +224,22 @@
             startButton.style.display = 'none';
             resetButton.style.display = 'inline-block';
             readerElement.style.display = 'block';
-            statusMessage.textContent = '1枚目のQRコードをスキャンしてください';
-            html5QrCode = new Html5Qrcode("reader");
-            const config = {
-                fps: 5,
-                qrbox: { width: 300, height: 300 } 
-            };
-            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-                .catch(err => {
-                    console.error("Scanner start error:", err);
-                    statusMessage.textContent = 'カメラの起動に失敗しました。';
-                });
+            statusMessage.textContent = 'カメラを準備しています...'; // 準備中のメッセージを追加
+
+            // 遅延を挟んでカメラの準備時間を確保する
+            setTimeout(() => {
+                statusMessage.textContent = '1枚目のQRコードをスキャンしてください';
+                html5QrCode = new Html5Qrcode("reader");
+                const config = {
+                    fps: 5,
+                    qrbox: { width: 300, height: 300 }
+                };
+                html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+                    .catch(err => {
+                        console.error("Scanner start error:", err);
+                        statusMessage.textContent = 'カメラの起動に失敗しました。';
+                    });
+            }, 200); // 200ミリ秒の遅延
         }
         
         function stopScanner(disableStart = false) {
