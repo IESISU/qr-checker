@@ -108,12 +108,12 @@
                 case 'scan':
                     playTone(900, 0.15, 'triangle');
                     break;
-                case 'success': // Pin-pon
-                    playTone(783.99, 0.15, 'sine', 0); // G5
-                    playTone(523.25, 0.15, 'sine', 0.2); // C5
+                case 'success': // より分かりやすい「ピンポーン」
+                    playTone(880.00, 0.2, 'sine', 0);    // 高い音 (A5)
+                    playTone(659.26, 0.25, 'sine', 0.2); // 低い音 (E5)
                     break;
-                case 'fail': // Buppu
-                    playTone(164.81, 0.3, 'square'); // E3
+                case 'fail': // より長く、はっきりした「ブー」
+                    playTone(130.81, 0.5, 'sawtooth'); // 低く、耳障りな音 (C3)
                     break;
             }
         }
