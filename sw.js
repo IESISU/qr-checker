@@ -1,12 +1,16 @@
-// オフラインで動作させるためのService Workerスクリプト (強制更新対応版)
+// オフラインで動作させるためのService Workerスクリプト (最終完成版)
 
-// バージョンを更新することで、新しいキャッシュ領域を確保します
-const CACHE_NAME = 'qr-checker-cache-v3'; 
+// バージョンを更新して、新しいキャッシュを確実に作成します
+const CACHE_NAME = 'qr-checker-cache-v4'; 
+// アプリに必要なすべてのファイルをキャッシュします
 const urlsToCache = [
   './',
   './index.html',
-  './manifest.json', // manifestもキャッシュに追加
-  'https://unpkg.com/html5-qrcode/html5-qrcode.min.js'
+  './manifest.json',
+  'https://unpkg.com/html5-qrcode/html5-qrcode.min.js',
+  // アイコンファイルもキャッシュに追加して完全オフライン化
+  'https://placehold.co/192x192/007bff/ffffff?text=QR',
+  'https://placehold.co/512x512/007bff/ffffff?text=QR'
 ];
 
 // 1. インストール処理: 新しいバージョンが来たら、待たずにすぐ有効化する
