@@ -78,7 +78,6 @@
         let html5QrCode = null;
         let accumulatedData = [];
         let audioContext;
-        let isScannerPaused = false;
 
         function initAudioContext() {
             if (!audioContext) {
@@ -108,12 +107,13 @@
                 case 'scan':
                     playTone(900, 0.15, 'triangle');
                     break;
-                case 'success': // より分かりやすい「ピンポーン」
-                    playTone(880.00, 0.2, 'sine', 0);    // 高い音 (A5)
-                    playTone(659.26, 0.25, 'sine', 0.2); // 低い音 (E5)
+                case 'success': // 「ピンポーン」
+                    playTone(880.00, 0.2, 'sine', 0);    
+                    playTone(659.26, 0.25, 'sine', 0.2); 
                     break;
-                case 'fail': // より長く、はっきりした「ブー」
-                    playTone(130.81, 0.5, 'sawtooth'); // 低く、耳障りな音 (C3)
+                case 'fail': // 甲高い「ブッブー」
+                    playTone(392.00, 0.2, 'square', 0);      // G4
+                    playTone(392.00, 0.2, 'square', 0.25);   // G4を少し遅らせて再度
                     break;
             }
         }
@@ -121,7 +121,6 @@
         function resetCurrentScan() {
             firstScanData = null;
             isWaitingForSecondScan = false;
-            isScannerPaused = false;
             statusMessage.textContent = '開始ボタンを押してください';
             firstScanPart1El.textContent = '-';
             firstScanPart2El.textContent = '-';
@@ -149,14 +148,20 @@
         }
 
         function onScanSuccess(decodedText) {
-            if (isScannerPaused) return;
+            // スキャナが一時停止中は何もしない
+            if (!html5QrCode || html5QrCode.getState() !== 2 /* SCANNING */) {
+                return;
+            }
 
             if (!isWaitingForSecondScan) {
-                isScannerPaused = true;
+                // 1枚目のスキャン後にスキャナを一時停止
+                html5QrCode.pause(); 
+
                 if (decodedText.length < 57) {
                     statusMessage.textContent = 'エラー: 1枚目のQRデータが短すぎます';
                     playSound('fail');
-                    setTimeout(() => { isScannerPaused = false; }, 1500);
+                    // 1.5秒後にスキャンを再開
+                    setTimeout(() => { if(html5QrCode) html5QrCode.resume(); }, 1500);
                     return;
                 }
                 const part1 = decodedText.substring(0, 7);
@@ -168,17 +173,19 @@
                 isWaitingForSecondScan = true;
                 playSound('scan');
                 
+                // 1.5秒後にスキャンを再開
                 setTimeout(() => {
-                    statusMessage.textContent = '2枚目をスキャンしてください';
-                    isScannerPaused = false;
+                    if (html5QrCode && html5QrCode.getState() === 3 /* PAUSED */) {
+                        statusMessage.textContent = '2枚目をスキャンしてください';
+                        html5QrCode.resume();
+                    }
                 }, 1500);
 
             } else {
-                isScannerPaused = true; // 2枚目読み取り後も一旦停止
+                // 2枚目読み取り後
                 if (decodedText.length < 60) {
                     statusMessage.textContent = 'エラー: 2枚目のQRデータが短すぎます';
                     playSound('fail');
-                    setTimeout(() => { isScannerPaused = false; }, 1500);
                     return;
                 }
                 const secondScanData = decodedText;
@@ -223,8 +230,8 @@
             statusMessage.textContent = '1枚目のQRコードをスキャンしてください';
             html5QrCode = new Html5Qrcode("reader");
             const config = {
-                fps: 5, // FPSを少し下げて、意図しない高速スキャンを防ぐ
-                qrbox: { width: 300, height: 300 } // スキャン範囲を拡大
+                fps: 5,
+                qrbox: { width: 300, height: 300 } 
             };
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
                 .catch(err => {
